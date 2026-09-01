@@ -1,0 +1,23 @@
+[Unit]
+Description=SKIML Slack Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=skimlbot
+Group=skimlbot
+WorkingDirectory=/opt/skiml-bot/app
+EnvironmentFile=/opt/skiml-bot/app/.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/skiml-bot/venv/bin/skiml-bot
+Restart=always
+RestartSec=10
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/skiml-bot/app/.secrets
+
+[Install]
+WantedBy=multi-user.target

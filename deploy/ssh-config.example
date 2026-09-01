@@ -1,0 +1,8 @@
+Host lab-cluster
+    HostName login.example.edu
+    User bot-user
+    Port 22
+    IdentityFile /opt/skiml-bot/app/.secrets/slurm-monitor
+    UserKnownHostsFile /opt/skiml-bot/app/.secrets/known_hosts
+    StrictHostKeyChecking yes
+    BatchMode yes

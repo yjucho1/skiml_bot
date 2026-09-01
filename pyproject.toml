@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "skiml-bot"
+version = "0.1.0"
+description = "Slack research lab assistant"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "google-api-python-client>=2.190",
+  "google-auth>=2.45",
+  "google-auth-oauthlib>=1.2",
+  "httpx>=0.25",
+  "notion-client>=2.7",
+  "openai>=1.100",
+  "pypdf>=5",
+  "slack-bolt>=1.27",
+]
+
+[project.optional-dependencies]
+dev = [
+  "mypy>=1.18,<2",
+  "pytest>=7.4,<9",
+  "pytest-cov>=4,<7",
+  "ruff>=0.12,<1",
+]
+
+[project.scripts]
+skiml-bot = "skiml_bot.app:main"
+skiml-calendar-auth = "skiml_bot.adapters.google_calendar:authorize_main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+packages = ["skiml_bot"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]

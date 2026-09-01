@@ -1,0 +1,28 @@
+display_information:
+  name: SKIML Bot
+  description: 연구 요약, 미팅 조율, Notion Q&A, 서버 모니터링
+  background_color: "#1D4ED8"
+features:
+  bot_user:
+    display_name: SKIML Bot
+    always_online: true
+oauth_config:
+  scopes:
+    bot:
+      - app_mentions:read
+      - channels:history
+      - channels:read
+      - chat:write
+      - groups:history
+      - groups:read
+      - users:read
+      - users:read.email
+settings:
+  event_subscriptions:
+    bot_events:
+      - app_mention
+  interactivity:
+    is_enabled: true
+  org_deploy_enabled: false
+  socket_mode_enabled: true
+  token_rotation_enabled: false

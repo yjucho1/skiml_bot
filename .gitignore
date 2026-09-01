@@ -1,0 +1,16 @@
+.env
+.venv/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.secrets/
+*.py[cod]
+*.egg-info/
+client_secret*.json
+google-calendar-token.json
+token.json
+build/
+dist/
+deploy/ssh-config
