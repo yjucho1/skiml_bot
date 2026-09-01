@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from skiml_bot.periodic_server_status import PeriodicServerStatusPublisher
 from skiml_bot.server_status import ServerStatus, SlurmNode
@@ -48,8 +49,7 @@ def test_periodic_publisher_posts_current_status_to_configured_channel() -> None
         FakeStatusSource(ServerStatus((SlurmNode("master", "mixed"),))),
         channel,
         channel_id="C0123456789",
-        interval_seconds=1800,
-        start_at=datetime(2026, 9, 1, 15, 0, tzinfo=timezone(timedelta(hours=9))),
+        schedule_timezone=ZoneInfo("Asia/Seoul"),
     )
 
     publisher.publish()
@@ -66,37 +66,66 @@ def test_periodic_publisher_posts_current_status_to_configured_channel() -> None
     ]
 
 
-def test_periodic_publisher_waits_one_interval_before_each_post() -> None:
+def test_periodic_publisher_waits_until_next_scheduled_hour() -> None:
     channel = FakeChannel()
     times = iter(
         (
-            datetime(2026, 9, 1, 14, 45, tzinfo=timezone(timedelta(hours=9))),
-            datetime(2026, 9, 1, 15, 0, tzinfo=timezone(timedelta(hours=9))),
+            datetime(2026, 9, 1, 7, 45, tzinfo=timezone(timedelta(hours=9))),
+            datetime(2026, 9, 1, 8, 0, tzinfo=timezone(timedelta(hours=9))),
         )
     )
     publisher = PeriodicServerStatusPublisher(
         FakeStatusSource(ServerStatus((SlurmNode("master", "mixed"),))),
         channel,
         channel_id="C0123456789",
-        interval_seconds=1800,
-        start_at=datetime(2026, 9, 1, 15, 0, tzinfo=timezone(timedelta(hours=9))),
+        schedule_timezone=ZoneInfo("Asia/Seoul"),
         clock=lambda: next(times),
     )
     stop = FakeStopSignal([False, True])
 
     publisher.run(stop)
 
-    assert stop.waits == [900, 1800]
+    assert stop.waits == [900, 7200]
     assert len(channel.messages) == 1
 
 
-def test_periodic_publisher_reports_failure_and_continues_next_interval() -> None:
+def test_periodic_publisher_waits_until_next_morning_after_last_post() -> None:
+    publisher = PeriodicServerStatusPublisher(
+        FakeStatusSource(ServerStatus((SlurmNode("master", "mixed"),))),
+        FakeChannel(),
+        channel_id="C0123456789",
+        schedule_timezone=ZoneInfo("Asia/Seoul"),
+    )
+
+    delay = publisher._seconds_until_next_publish(
+        datetime(2026, 9, 1, 20, 0, tzinfo=timezone(timedelta(hours=9)))
+    )
+
+    assert delay == 12 * 60 * 60
+
+
+def test_periodic_publisher_converts_clock_to_schedule_timezone() -> None:
+    publisher = PeriodicServerStatusPublisher(
+        FakeStatusSource(ServerStatus((SlurmNode("master", "mixed"),))),
+        FakeChannel(),
+        channel_id="C0123456789",
+        schedule_timezone=ZoneInfo("Asia/Seoul"),
+    )
+
+    delay = publisher._seconds_until_next_publish(
+        datetime(2026, 8, 31, 22, 30, tzinfo=timezone.utc)
+    )
+
+    assert delay == 30 * 60
+
+
+def test_periodic_publisher_reports_failure_and_continues_at_next_scheduled_hour() -> None:
     timezone_kst = timezone(timedelta(hours=9))
     times = iter(
         (
-            datetime(2026, 9, 1, 14, 59, tzinfo=timezone_kst),
-            datetime(2026, 9, 1, 15, 0, tzinfo=timezone_kst),
-            datetime(2026, 9, 1, 15, 30, tzinfo=timezone_kst),
+            datetime(2026, 9, 1, 7, 59, tzinfo=timezone_kst),
+            datetime(2026, 9, 1, 8, 0, tzinfo=timezone_kst),
+            datetime(2026, 9, 1, 10, 0, tzinfo=timezone_kst),
         )
     )
     channel = FakeChannel()
@@ -109,8 +138,7 @@ def test_periodic_publisher_reports_failure_and_continues_next_interval() -> Non
         ),
         channel,
         channel_id="C0123456789",
-        interval_seconds=1800,
-        start_at=datetime(2026, 9, 1, 15, 0, tzinfo=timezone_kst),
+        schedule_timezone=ZoneInfo("Asia/Seoul"),
         clock=lambda: next(times),
     )
 

@@ -82,13 +82,11 @@ def build_app(settings: Settings) -> tuple[App, PeriodicServerStatusPublisher | 
 
     periodic_status: PeriodicServerStatusPublisher | None = None
     if server_status is not None and settings.slurm_status_channel_id is not None:
-        assert settings.slurm_status_start_at is not None
         periodic_status = PeriodicServerStatusPublisher(
             server_status,
             slack,
             channel_id=settings.slurm_status_channel_id,
-            interval_seconds=settings.slurm_status_interval_seconds,
-            start_at=settings.slurm_status_start_at,
+            schedule_timezone=ZoneInfo(settings.timezone),
         )
 
     @app.event("app_mention")

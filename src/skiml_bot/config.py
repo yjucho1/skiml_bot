@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from datetime import datetime
 
 
 def _required(name: str) -> str:
@@ -32,8 +31,6 @@ class Settings:
     slurm_ssh_known_hosts_file: str | None
     slurm_ssh_timeout_seconds: int
     slurm_status_channel_id: str | None
-    slurm_status_interval_seconds: int
-    slurm_status_start_at: datetime | None
     timezone: str
     enabled_features: frozenset[str]
 
@@ -47,11 +44,6 @@ class Settings:
             return _required(name) if feature in enabled_features else None
 
         status_channel_id = os.getenv("SLURM_STATUS_CHANNEL_ID", "").strip() or None
-        status_start_at: datetime | None = None
-        if status_channel_id:
-            status_start_at = datetime.fromisoformat(_required("SLURM_STATUS_START_AT"))
-            if status_start_at.tzinfo is None or status_start_at.utcoffset() is None:
-                raise ValueError("SLURM_STATUS_START_AT must include a timezone offset")
 
         return cls(
             slack_bot_token=_required("SLACK_BOT_TOKEN"),
@@ -66,8 +58,6 @@ class Settings:
             slurm_ssh_known_hosts_file=os.getenv("SLURM_SSH_KNOWN_HOSTS_FILE") or None,
             slurm_ssh_timeout_seconds=int(os.getenv("SLURM_SSH_TIMEOUT_SECONDS", "10")),
             slurm_status_channel_id=status_channel_id,
-            slurm_status_interval_seconds=int(os.getenv("SLURM_STATUS_INTERVAL_SECONDS", "1800")),
-            slurm_status_start_at=status_start_at,
             timezone=os.getenv("LAB_TIMEZONE", "Asia/Seoul"),
             enabled_features=enabled_features,
         )

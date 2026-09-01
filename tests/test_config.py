@@ -43,13 +43,9 @@ def test_server_status_requires_only_ssh_target(monkeypatch) -> None:
     monkeypatch.setenv("SLURM_SSH_TARGET", "bot-user@login.example.edu")
     monkeypatch.setenv("SLURM_SSH_TIMEOUT_SECONDS", "7")
     monkeypatch.setenv("SLURM_STATUS_CHANNEL_ID", "C0123456789")
-    monkeypatch.setenv("SLURM_STATUS_INTERVAL_SECONDS", "1800")
-    monkeypatch.setenv("SLURM_STATUS_START_AT", "2026-09-01T15:00:00+09:00")
 
     settings = Settings.from_env()
 
     assert settings.slurm_ssh_target == "bot-user@login.example.edu"
     assert settings.slurm_ssh_timeout_seconds == 7
     assert settings.slurm_status_channel_id == "C0123456789"
-    assert settings.slurm_status_interval_seconds == 1800
-    assert settings.slurm_status_start_at.isoformat() == "2026-09-01T15:00:00+09:00"

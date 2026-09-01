@@ -14,7 +14,7 @@ Socket Mode 봇입니다. 모든 사용자 요청은 `@SKIML Bot` 멘션이 있�
 | 미팅 조율 | `@SKIML Bot 회의 잡아줘` | 채널 멤버의 free/busy를 조회하고 후보 버튼 제시 |
 | Notion Q&A | `@SKIML Bot GPU 서버 예약 규칙이 뭐야?` | 허용된 Notion 페이지를 검색해 출처 링크와 답변 제공 |
 | 서버 상태 | `@SKIML Bot 연구실서버 상태 알려줘` | 요청 즉시 master SSH 접속과 Slurm DRAIN 계열 노드 확인 |
-| 서버 상태 게시 | 설정된 시작 시각부터 30분마다 | 지정 채널에 같은 Slurm 상태를 자동 게시 |
+| 서버 상태 게시 | 매일 08, 10, 12, 14, 16, 18, 20시 정각 | 지정 채널에 같은 Slurm 상태를 자동 게시 |
 
 논문 요약 별칭은 `요약`, `요약해`, `요약해줘`, `써머리`, `summary`, `summarize`를
 대소문자와 관계없이 지원합니다. 미팅 요청은 `미팅`, `회의`, `meeting`, `call`과
@@ -78,10 +78,8 @@ Socket Mode를 사용하므로 공개 HTTP 엔드포인트는 필요하지 않�
 | `SLURM_SSH_IDENTITY_FILE` | 선택 | master 접속용 SSH private key 경로 |
 | `SLURM_SSH_KNOWN_HOSTS_FILE` | 선택 | 검증된 master host key가 든 파일 경로 |
 | `SLURM_SSH_TIMEOUT_SECONDS` | 선택 | SSH 연결 제한 시간, 기본값 10초 |
-| `SLURM_STATUS_CHANNEL_ID` | 선택 | 30분 주기 상태를 게시할 Slack 채널 ID |
-| `SLURM_STATUS_INTERVAL_SECONDS` | 주기 게시 | 게시 간격, 기본값 1,800초 |
-| `SLURM_STATUS_START_AT` | 주기 게시 | 최초 게시 기준 시각, 타임존을 포함한 ISO 8601 |
-| `LAB_TIMEZONE` | 선택 | 기본값 `Asia/Seoul` |
+| `SLURM_STATUS_CHANNEL_ID` | 선택 | 정기 상태를 게시할 Slack 채널 ID |
+| `LAB_TIMEZONE` | 선택 | 정기 게시 및 미팅 표시 기준 타임존, 기본값 `Asia/Seoul` |
 
 논문 조사와 채널·쓰레드 요약은 핵심 기능이라 별도 feature flag 없이 항상 활성화됩니다.
 
@@ -171,8 +169,7 @@ SLURM_SSH_TARGET=bot-user@login.example.edu
 SLURM_SSH_IDENTITY_FILE=.secrets/slurm-monitor
 SLURM_SSH_KNOWN_HOSTS_FILE=.secrets/known_hosts
 SLURM_STATUS_CHANNEL_ID=C0123456789
-SLURM_STATUS_INTERVAL_SECONDS=1800
-SLURM_STATUS_START_AT=2026-09-01T15:00:00+09:00
+LAB_TIMEZONE=Asia/Seoul
 ```
 
 봇이 실행되는 머신에서 먼저 비대화형 접속과 Slurm 출력을 확인합니다.
@@ -184,9 +181,10 @@ ssh -o BatchMode=yes -o StrictHostKeyChecking=yes \
 ```
 
 봇은 사용자가 `@SKIML Bot 연구실서버 상태 알려줘`처럼 멘션하면 즉시 같은 명령을 실행합니다.
-또한 `SLURM_STATUS_CHANNEL_ID`와 `SLURM_STATUS_START_AT`을 설정하면 기준 시각부터 지정 간격마다
-같은 결과를 채널에 게시합니다. 재시작 중 놓친 결과는 몰아서 게시하지 않고 다음 시간 경계부터
-재개합니다. SSH 접속 성공 여부, 전체 노드 수와 `DRAIN`, `DRAINED`, `DRAINING` 계열 노드 및
+또한 `SLURM_STATUS_CHANNEL_ID`를 설정하면 `LAB_TIMEZONE` 기준 매일 08:00, 10:00, 12:00,
+14:00, 16:00, 18:00, 20:00에 같은 결과를 채널에 게시합니다. 재시작 중 놓친 결과는
+몰아서 게시하지 않고 다음 지정 시각부터 재개합니다. SSH 접속 성공 여부, 전체 노드 수와
+`DRAIN`, `DRAINED`, `DRAINING` 계열 노드 및
 사유를 표시하며 CPU/GPU 사용률은 수집하지 않습니다. SSH 키 교환 중 연결 리셋이나 타임아웃은
 2초 간격으로 최대 3회 시도한 뒤에만 실패로 게시합니다.
 
