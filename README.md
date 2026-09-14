@@ -181,8 +181,8 @@ ssh -o BatchMode=yes -o StrictHostKeyChecking=yes \
 ```
 
 봇은 사용자가 `@SKIML Bot 연구실서버 상태 알려줘`처럼 멘션하면 즉시 같은 명령을 실행합니다.
-또한 `SLURM_STATUS_CHANNEL_ID`를 설정하면 `LAB_TIMEZONE` 기준 매일 08:00, 10:00, 12:00,
-14:00, 16:00, 18:00, 20:00에 같은 결과를 채널에 게시합니다. 재시작 중 놓친 결과는
+또한 `SLURM_STATUS_CHANNEL_ID`를 설정하면 `LAB_TIMEZONE` 기준 매일 08:00, 12:00,
+16:00, 20:00에 같은 결과를 채널에 게시합니다. 재시작 중 놓친 결과는
 몰아서 게시하지 않고 다음 지정 시각부터 재개합니다. SSH 접속 성공 여부, 전체 노드 수와
 `DRAIN`, `DRAINED`, `DRAINING` 계열 노드 및
 사유를 표시하며 CPU/GPU 사용률은 수집하지 않습니다. SSH 키 교환 중 연결 리셋이나 타임아웃은

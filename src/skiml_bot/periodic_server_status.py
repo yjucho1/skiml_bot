@@ -11,7 +11,7 @@ from skiml_bot.server_status import ServerStatus
 
 LOGGER = logging.getLogger(__name__)
 FAILURE_MESSAGE = "🔴 *[연구실 서버 상태]*\nSSH 또는 `sinfo` 조회에 실패했습니다."
-STATUS_PUBLISH_HOURS = (8, 10, 12, 14, 16, 18, 20)
+STATUS_PUBLISH_HOURS = (8, 12, 16, 20)
 
 
 class StatusSource(Protocol):

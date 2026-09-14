@@ -85,7 +85,7 @@ def test_periodic_publisher_waits_until_next_scheduled_hour() -> None:
 
     publisher.run(stop)
 
-    assert stop.waits == [900, 7200]
+    assert stop.waits == [900, 14400]
     assert len(channel.messages) == 1
 
 
@@ -125,7 +125,7 @@ def test_periodic_publisher_reports_failure_and_continues_at_next_scheduled_hour
         (
             datetime(2026, 9, 1, 7, 59, tzinfo=timezone_kst),
             datetime(2026, 9, 1, 8, 0, tzinfo=timezone_kst),
-            datetime(2026, 9, 1, 10, 0, tzinfo=timezone_kst),
+            datetime(2026, 9, 1, 12, 0, tzinfo=timezone_kst),
         )
     )
     channel = FakeChannel()
