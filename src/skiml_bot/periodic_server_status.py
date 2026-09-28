@@ -7,11 +7,14 @@ from collections.abc import Callable
 from datetime import datetime, time, timedelta, timezone, tzinfo
 from typing import Protocol
 
+from skiml_bot.adapters.ssh_slurm import SSHConnectionError
 from skiml_bot.server_status import ServerStatus
 
 LOGGER = logging.getLogger(__name__)
 FAILURE_MESSAGE = "🔴 *[연구실 서버 상태]*\nSSH 또는 `sinfo` 조회에 실패했습니다."
 STATUS_PUBLISH_HOURS = (8, 12, 16, 20)
+CONNECTION_FAILURE_REASON = "접속 안됨"
+DRAIN_NODE_REASON = "drain 노드 발생"
 
 
 class StatusSource(Protocol):
@@ -26,6 +29,10 @@ class StopSignal(Protocol):
     def wait(self, timeout: float) -> bool: ...
 
 
+class AlertWorkflow(Protocol):
+    def trigger(self, reason: str) -> None: ...
+
+
 class PeriodicServerStatusPublisher:
     def __init__(
         self,
@@ -36,6 +43,7 @@ class PeriodicServerStatusPublisher:
         schedule_timezone: tzinfo,
         publish_hours: tuple[int, ...] = STATUS_PUBLISH_HOURS,
         clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
+        alert_workflow: AlertWorkflow | None = None,
     ) -> None:
         if not channel_id:
             raise ValueError("Periodic server status channel ID must not be empty")
@@ -49,9 +57,12 @@ class PeriodicServerStatusPublisher:
         self._schedule_timezone = schedule_timezone
         self._publish_hours = tuple(sorted(publish_hours))
         self._clock = clock
+        self._alert_workflow = alert_workflow
 
     def publish(self) -> None:
         status = self._source.fetch()
+        if status.drain_nodes:
+            self._trigger_alert(DRAIN_NODE_REASON)
         self._channel.post_channel(self._channel_id, status.for_slack())
 
     def run(self, stop: StopSignal) -> None:
@@ -61,12 +72,27 @@ class PeriodicServerStatusPublisher:
                 return
             try:
                 self.publish()
+            except SSHConnectionError:
+                LOGGER.exception("Periodic Slurm SSH connection failed")
+                self._trigger_alert(CONNECTION_FAILURE_REASON)
+                self._post_failure_message()
             except Exception:
                 LOGGER.exception("Periodic Slurm status query failed")
-                try:
-                    self._channel.post_channel(self._channel_id, FAILURE_MESSAGE)
-                except Exception:
-                    LOGGER.exception("Failed to post periodic Slurm status error to Slack")
+                self._post_failure_message()
+
+    def _trigger_alert(self, reason: str) -> None:
+        if self._alert_workflow is None:
+            return
+        try:
+            self._alert_workflow.trigger(reason)
+        except Exception:
+            LOGGER.exception("Failed to trigger the Slurm alert workflow")
+
+    def _post_failure_message(self) -> None:
+        try:
+            self._channel.post_channel(self._channel_id, FAILURE_MESSAGE)
+        except Exception:
+            LOGGER.exception("Failed to post periodic Slurm status error to Slack")
 
     def _seconds_until_next_publish(self, now: datetime) -> float:
         if now.tzinfo is None or now.utcoffset() is None:

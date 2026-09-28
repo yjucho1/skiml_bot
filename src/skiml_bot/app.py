@@ -18,6 +18,7 @@ from skiml_bot.adapters.openai_text import OpenAITextAssistant
 from skiml_bot.adapters.paper_agent import OpenAIPaperResearchAgent
 from skiml_bot.adapters.scholarly import ArxivDiscovery, CompositeDiscovery, OpenAlexDiscovery
 from skiml_bot.adapters.slack import SlackGateway
+from skiml_bot.adapters.slack_workflow import SlackWorkflowWebhook
 from skiml_bot.adapters.ssh_slurm import (
     SlurmCommandError,
     SSHConnectionError,
@@ -32,7 +33,11 @@ from skiml_bot.meetings import (
     MeetingRequest,
     is_meeting_request,
 )
-from skiml_bot.periodic_server_status import PeriodicServerStatusPublisher
+from skiml_bot.periodic_server_status import (
+    CONNECTION_FAILURE_REASON,
+    DRAIN_NODE_REASON,
+    PeriodicServerStatusPublisher,
+)
 from skiml_bot.research import (
     ResearchAssistant,
     SlackMessage,
@@ -71,6 +76,7 @@ def build_app(settings: Settings) -> tuple[App, PeriodicServerStatusPublisher | 
         )
 
     server_status: SSHSlurmStatusSource | None = None
+    server_alert_workflow: SlackWorkflowWebhook | None = None
     if "server_status" in settings.enabled_features:
         assert settings.slurm_ssh_target is not None
         server_status = SSHSlurmStatusSource(
@@ -79,6 +85,8 @@ def build_app(settings: Settings) -> tuple[App, PeriodicServerStatusPublisher | 
             known_hosts_file=settings.slurm_ssh_known_hosts_file,
             timeout_seconds=settings.slurm_ssh_timeout_seconds,
         )
+        if settings.slurm_alert_workflow_webhook_url is not None:
+            server_alert_workflow = SlackWorkflowWebhook(settings.slurm_alert_workflow_webhook_url)
 
     periodic_status: PeriodicServerStatusPublisher | None = None
     if server_status is not None and settings.slurm_status_channel_id is not None:
@@ -87,6 +95,7 @@ def build_app(settings: Settings) -> tuple[App, PeriodicServerStatusPublisher | 
             slack,
             channel_id=settings.slurm_status_channel_id,
             schedule_timezone=ZoneInfo(settings.timezone),
+            alert_workflow=server_alert_workflow,
         )
 
     @app.event("app_mention")
@@ -126,6 +135,9 @@ def build_app(settings: Settings) -> tuple[App, PeriodicServerStatusPublisher | 
                         status = server_status.fetch()
                     except SSHConnectionError:
                         logger.exception("Failed to connect to the Slurm master over SSH")
+                        _trigger_server_alert(
+                            server_alert_workflow, CONNECTION_FAILURE_REASON, logger
+                        )
                         slack.post(
                             channel_id,
                             reply_ts,
@@ -141,6 +153,8 @@ def build_app(settings: Settings) -> tuple[App, PeriodicServerStatusPublisher | 
                             "Slurm 상태와 계정 권한을 확인해 주세요.",
                         )
                     else:
+                        if status.drain_nodes:
+                            _trigger_server_alert(server_alert_workflow, DRAIN_NODE_REASON, logger)
                         slack.post(channel_id, reply_ts, status.for_slack())
             elif is_paper_summary_request(raw_text):
                 research.handle(
@@ -204,6 +218,19 @@ def build_app(settings: Settings) -> tuple[App, PeriodicServerStatusPublisher | 
             respond(text="미팅 초대를 생성하지 못했습니다. 후보가 만료되었을 수 있습니다.")
 
     return app, periodic_status
+
+
+def _trigger_server_alert(
+    workflow: SlackWorkflowWebhook | None,
+    reason: str,
+    logger: Any,
+) -> None:
+    if workflow is None:
+        return
+    try:
+        workflow.trigger(reason)
+    except Exception:
+        logger.exception("Failed to trigger the Slurm alert workflow")
 
 
 def _arrange_meeting(

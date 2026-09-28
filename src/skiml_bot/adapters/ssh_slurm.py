@@ -6,9 +6,12 @@ import subprocess
 import time
 from collections.abc import Callable
 
-from skiml_bot.server_status import ServerStatus, SlurmNode
+from skiml_bot.server_status import ServerStatus, SlurmNode, StorageVolume
 
 SINFO_COMMAND = "sinfo -N -h -o '%N|%T|%E'"
+STATUS_OUTPUT_SEPARATOR = "__SKIML_STORAGE__"
+DF_COMMAND = "df -hP -x tmpfs -x devtmpfs -x squashfs"
+REMOTE_STATUS_COMMAND = f"{SINFO_COMMAND}; printf '\\n{STATUS_OUTPUT_SEPARATOR}\\n'; {DF_COMMAND}"
 Runner = Callable[[list[str], float], subprocess.CompletedProcess[str]]
 Sleeper = Callable[[float], None]
 MAX_SSH_ATTEMPTS = 3
@@ -69,7 +72,7 @@ class SSHSlurmStatusSource:
             argv.extend(["-o", f"UserKnownHostsFile={self._known_hosts_file}"])
         if self._identity_file:
             argv.extend(["-i", self._identity_file])
-        argv.extend([self._target, SINFO_COMMAND])
+        argv.extend([self._target, REMOTE_STATUS_COMMAND])
 
         result = self._run_ssh_with_retries(argv)
 
@@ -78,10 +81,11 @@ class SSHSlurmStatusSource:
             raise SSHConnectionError(detail)
         if result.returncode != 0:
             raise SlurmCommandError(detail)
-        nodes = parse_sinfo(result.stdout)
+        sinfo_output, df_output = split_status_output(result.stdout)
+        nodes = parse_sinfo(sinfo_output)
         if not nodes:
             raise SlurmCommandError("sinfo returned no nodes")
-        return ServerStatus(nodes)
+        return ServerStatus(nodes, parse_df(df_output))
 
     def _run_ssh_with_retries(self, argv: list[str]) -> subprocess.CompletedProcess[str]:
         for attempt in range(1, MAX_SSH_ATTEMPTS + 1):
@@ -137,3 +141,38 @@ def parse_sinfo(output: str) -> tuple[SlurmNode, ...]:
         if previous is None or (node.is_drain and not previous.is_drain):
             by_name[name] = node
     return tuple(by_name.values())
+
+
+def split_status_output(output: str) -> tuple[str, str]:
+    """Split the combined remote output; accept legacy sinfo-only output in tests."""
+    if STATUS_OUTPUT_SEPARATOR not in output:
+        return output, ""
+    sinfo_output, df_output = output.split(STATUS_OUTPUT_SEPARATOR, 1)
+    return sinfo_output, df_output
+
+
+def parse_df(output: str) -> tuple[StorageVolume, ...]:
+    """Parse POSIX `df -hP` output into display-ready storage volumes."""
+    volumes: list[StorageVolume] = []
+    for line in output.splitlines():
+        if not line.strip() or line.casefold().startswith("filesystem"):
+            continue
+        parts = line.split(maxsplit=5)
+        if len(parts) != 6 or not parts[4].endswith("%"):
+            raise SlurmCommandError(f"Unexpected df output: {line}")
+        filesystem, size, used, available, raw_percent, mount_point = parts
+        try:
+            use_percent = int(raw_percent[:-1])
+        except ValueError as error:
+            raise SlurmCommandError(f"Unexpected df output: {line}") from error
+        volumes.append(
+            StorageVolume(
+                filesystem=filesystem,
+                size=size,
+                used=used,
+                available=available,
+                use_percent=use_percent,
+                mount_point=mount_point,
+            )
+        )
+    return tuple(volumes)

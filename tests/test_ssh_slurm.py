@@ -6,6 +6,7 @@ from skiml_bot.adapters.ssh_slurm import (
     SlurmCommandError,
     SSHConnectionError,
     SSHSlurmStatusSource,
+    parse_df,
     parse_sinfo,
 )
 
@@ -27,7 +28,16 @@ def test_fetch_uses_batch_ssh_and_fixed_sinfo_command() -> None:
 
     def fake_runner(argv: list[str], timeout: float) -> subprocess.CompletedProcess[str]:
         calls.append((argv, timeout))
-        return subprocess.CompletedProcess(argv, 0, "master|mixed|none\nn01|idle|none\n", "")
+        return subprocess.CompletedProcess(
+            argv,
+            0,
+            "master|mixed|none\nn01|idle|none\n"
+            "__SKIML_STORAGE__\n"
+            "Filesystem Size Used Avail Use% Mounted on\n"
+            "/dev/sda1 200G 120G 80G 60% /\n"
+            "storage:/data 10T 7T 3T 70% /data\n",
+            "",
+        )
 
     source = SSHSlurmStatusSource(
         "bot-user@login.example.edu",
@@ -40,6 +50,10 @@ def test_fetch_uses_batch_ssh_and_fixed_sinfo_command() -> None:
     status = source.fetch()
 
     assert len(status.nodes) == 2
+    assert [(volume.mount_point, volume.available) for volume in status.storage] == [
+        ("/", "80G"),
+        ("/data", "3T"),
+    ]
     argv, timeout = calls[0]
     assert argv == [
         "ssh",
@@ -54,9 +68,23 @@ def test_fetch_uses_batch_ssh_and_fixed_sinfo_command() -> None:
         "-i",
         "/run/secrets/slurm-monitor",
         "bot-user@login.example.edu",
-        "sinfo -N -h -o '%N|%T|%E'",
+        "sinfo -N -h -o '%N|%T|%E'; printf '\\n__SKIML_STORAGE__\\n'; "
+        "df -hP -x tmpfs -x devtmpfs -x squashfs",
     ]
     assert timeout == 9
+
+
+def test_parse_df_reads_human_readable_capacity() -> None:
+    volumes = parse_df(
+        "Filesystem Size Used Avail Use% Mounted on\n"
+        "/dev/sda1 200G 120G 80G 60% /\n"
+        "storage:/data 10T 9.2T 800G 92% /data\n"
+    )
+
+    assert [(volume.mount_point, volume.available, volume.use_percent) for volume in volumes] == [
+        ("/", "80G", 60),
+        ("/data", "800G", 92),
+    ]
 
 
 def test_fetch_distinguishes_ssh_failure_from_slurm_failure() -> None:

@@ -1,4 +1,4 @@
-from skiml_bot.server_status import ServerStatus, SlurmNode, is_server_status_request
+from skiml_bot.server_status import ServerStatus, SlurmNode, StorageVolume, is_server_status_request
 
 
 def test_server_status_request_requires_bot_mention() -> None:
@@ -43,3 +43,19 @@ def test_server_status_reports_no_drained_nodes() -> None:
     assert "*전체 노드* — 6개" in message
     assert "*DRAIN 계열* — 0개" in message
     assert "DRAIN 상태인 노드가 없습니다." in message
+
+
+def test_server_status_reports_remaining_storage_and_warns_at_ninety_percent() -> None:
+    status = ServerStatus(
+        nodes=(SlurmNode("master", "mixed"),),
+        storage=(
+            StorageVolume("/dev/sda1", "200G", "120G", "80G", 60, "/"),
+            StorageVolume("storage:/data", "10T", "9.2T", "800G", 92, "/data"),
+        ),
+    )
+
+    message = status.for_slack()
+
+    assert "*스토리지 여유 공간*" in message
+    assert "🟢 `/` — 80G 남음 / 200G (60% 사용)" in message
+    assert "🔴 `/data` — 800G 남음 / 10T (92% 사용)" in message

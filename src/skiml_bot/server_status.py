@@ -35,8 +35,19 @@ class SlurmNode:
 
 
 @dataclass(frozen=True)
+class StorageVolume:
+    filesystem: str
+    size: str
+    used: str
+    available: str
+    use_percent: int
+    mount_point: str
+
+
+@dataclass(frozen=True)
 class ServerStatus:
     nodes: tuple[SlurmNode, ...]
+    storage: tuple[StorageVolume, ...] = ()
 
     @property
     def drain_nodes(self) -> tuple[SlurmNode, ...]:
@@ -54,9 +65,20 @@ class ServerStatus:
             lines.append("🟢 DRAIN 상태인 노드가 없습니다.")
         else:
             lines.extend(_format_drain_node(node) for node in drained)
+        if self.storage:
+            lines.append("*스토리지 여유 공간*")
+            lines.extend(_format_storage_volume(volume) for volume in self.storage)
         return "\n".join(lines)
 
 
 def _format_drain_node(node: SlurmNode) -> str:
     reason = f" — {node.reason}" if node.reason else ""
     return f"🟠 `{node.name}` — {node.state}{reason}"
+
+
+def _format_storage_volume(volume: StorageVolume) -> str:
+    indicator = "🔴" if volume.use_percent >= 90 else "🟢"
+    return (
+        f"{indicator} `{volume.mount_point}` — {volume.available} 남음 / "
+        f"{volume.size} ({volume.use_percent}% 사용)"
+    )
