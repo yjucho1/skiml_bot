@@ -56,7 +56,7 @@ def test_server_status_reports_remaining_storage_and_warns_at_ninety_percent() -
 
     message = status.for_slack()
 
-    assert "*스토리지 여유 공간 - 상위 3개*" in message
+    assert "*스토리지 사용 공간 - 상위 3개*" in message
     assert "🟢 `/home` — 825G 남음 / 1.8T (51% 사용)" in message
     assert "🔴 `/data` — 800G 남음 / 10T (92% 사용)" in message
     assert status.low_storage_volumes == (status.storage[1],)
@@ -67,16 +67,16 @@ def test_server_status_displays_only_three_volumes_but_checks_all_for_low_space(
         nodes=(SlurmNode("master", "mixed"),),
         storage=(
             StorageVolume("n03:/data5", "7T", "2T", "4.7T", 29, "/data5"),
-            StorageVolume("n03:/data7", "7T", "2.4T", "4.3T", 37, "/data7"),
             StorageVolume("n03:/data4", "7T", "2.8T", "3.9T", 42, "/data4"),
             StorageVolume("n03:/data8", "7T", "6.5T", "500G", 93, "/data8"),
+            StorageVolume("n03:/data7", "7T", "2.4T", "4.3T", 37, "/data7"),
         ),
     )
 
     message = status.for_slack()
 
-    assert "`/data5`" in message
-    assert "`/data7`" in message
     assert "`/data4`" in message
-    assert "`/data8`" not in message
-    assert status.low_storage_volumes == (status.storage[3],)
+    assert "`/data8`" in message
+    assert "`/data7`" in message
+    assert "`/data5`" not in message
+    assert status.low_storage_volumes == (status.storage[2],)

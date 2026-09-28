@@ -74,9 +74,14 @@ class ServerStatus:
         else:
             lines.extend(_format_drain_node(node) for node in drained)
         if self.storage:
-            lines.append("*스토리지 여유 공간 - 상위 3개*")
+            lines.append("*스토리지 사용 공간 - 상위 3개*")
             lines.extend(
-                _format_storage_volume(volume) for volume in self.storage[:STORAGE_DISPLAY_LIMIT]
+                _format_storage_volume(volume)
+                for volume in sorted(
+                    self.storage,
+                    key=lambda item: item.use_percent,
+                    reverse=True,
+                )[:STORAGE_DISPLAY_LIMIT]
             )
         return "\n".join(lines)
 

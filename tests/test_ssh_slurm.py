@@ -52,8 +52,8 @@ def test_fetch_uses_batch_ssh_and_fixed_sinfo_command() -> None:
 
     assert len(status.nodes) == 2
     assert [(volume.mount_point, volume.available) for volume in status.storage] == [
-        ("/data", "3T"),
         ("/home", "825G"),
+        ("/data", "3T"),
     ]
     argv, timeout = calls[0]
     assert argv == [
@@ -87,10 +87,10 @@ def test_parse_df_reads_human_readable_capacity() -> None:
     )
 
     assert [(volume.mount_point, volume.available, volume.use_percent) for volume in volumes] == [
-        ("/data2", "4.7T", 29),
-        ("/data3", "1.4T", 79),
         ("/home", "825G", 51),
         ("/data", "800G", 92),
+        ("/data2", "4.7T", 29),
+        ("/data3", "1.4T", 79),
     ]
 
 

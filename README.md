@@ -188,7 +188,7 @@ ssh -o BatchMode=yes -o StrictHostKeyChecking=yes \
 `DRAIN`, `DRAINED`, `DRAINING` 계열 노드 및
 사유를 표시합니다. 같은 SSH 연결에서 `df -h`도 실행해 임시 파일시스템을 제외한 각 마운트의
 전체 용량, 남은 용량과 사용률을 함께 표시합니다. 스토리지 출력은 `/home`, `/data`,
-`/data2`~`/data9`로 제한하고, 남은 용량이 큰 상위 3개만 표시합니다. CPU/GPU 사용률은
+`/data2`~`/data9`로 제한하고, 사용률이 높은 상위 3개만 표시합니다. CPU/GPU 사용률은
 수집하지 않습니다.
 SSH 키 교환 중 연결 리셋이나 타임아웃은
 2초 간격으로 최대 3회 시도한 뒤에만 실패로 게시합니다.
