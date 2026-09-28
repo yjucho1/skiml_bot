@@ -5,6 +5,7 @@ from __future__ import annotations
 import subprocess
 import time
 from collections.abc import Callable
+from decimal import Decimal, InvalidOperation
 
 from skiml_bot.server_status import ServerStatus, SlurmNode, StorageVolume
 
@@ -12,6 +13,18 @@ SINFO_COMMAND = "sinfo -N -h -o '%N|%T|%E'"
 STATUS_OUTPUT_SEPARATOR = "__SKIML_STORAGE__"
 DF_COMMAND = "df -hP -x tmpfs -x devtmpfs -x squashfs"
 REMOTE_STATUS_COMMAND = f"{SINFO_COMMAND}; printf '\\n{STATUS_OUTPUT_SEPARATOR}\\n'; {DF_COMMAND}"
+MONITORED_STORAGE_MOUNT_POINTS = frozenset(
+    {"/home", "/data", *(f"/data{number}" for number in range(2, 10))}
+)
+STORAGE_UNIT_FACTORS = {
+    "": 1,
+    "K": 1024,
+    "M": 1024**2,
+    "G": 1024**3,
+    "T": 1024**4,
+    "P": 1024**5,
+    "E": 1024**6,
+}
 Runner = Callable[[list[str], float], subprocess.CompletedProcess[str]]
 Sleeper = Callable[[float], None]
 MAX_SSH_ATTEMPTS = 3
@@ -165,6 +178,8 @@ def parse_df(output: str) -> tuple[StorageVolume, ...]:
             use_percent = int(raw_percent[:-1])
         except ValueError as error:
             raise SlurmCommandError(f"Unexpected df output: {line}") from error
+        if mount_point not in MONITORED_STORAGE_MOUNT_POINTS:
+            continue
         volumes.append(
             StorageVolume(
                 filesystem=filesystem,
@@ -175,4 +190,18 @@ def parse_df(output: str) -> tuple[StorageVolume, ...]:
                 mount_point=mount_point,
             )
         )
-    return tuple(volumes)
+    return tuple(
+        sorted(volumes, key=lambda volume: _human_size_bytes(volume.available), reverse=True)
+    )
+
+
+def _human_size_bytes(value: str) -> Decimal:
+    normalized = value.strip().upper()
+    unit = normalized[-1] if normalized and normalized[-1].isalpha() else ""
+    number = normalized[:-1] if unit else normalized
+    if unit not in STORAGE_UNIT_FACTORS:
+        raise SlurmCommandError(f"Unexpected df size: {value}")
+    try:
+        return Decimal(number) * STORAGE_UNIT_FACTORS[unit]
+    except InvalidOperation as error:
+        raise SlurmCommandError(f"Unexpected df size: {value}") from error

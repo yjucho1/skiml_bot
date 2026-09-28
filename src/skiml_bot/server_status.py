@@ -12,6 +12,8 @@ STATUS_PATTERN = re.compile(
     r"(?:알려|일려|확인|보여|체크).*(?:상태|status)",
     re.IGNORECASE,
 )
+STORAGE_DISPLAY_LIMIT = 3
+STORAGE_WARNING_PERCENT = 90
 
 
 def is_server_status_request(text: str) -> bool:
@@ -53,6 +55,12 @@ class ServerStatus:
     def drain_nodes(self) -> tuple[SlurmNode, ...]:
         return tuple(node for node in self.nodes if node.is_drain)
 
+    @property
+    def low_storage_volumes(self) -> tuple[StorageVolume, ...]:
+        return tuple(
+            volume for volume in self.storage if volume.use_percent >= STORAGE_WARNING_PERCENT
+        )
+
     def for_slack(self) -> str:
         drained = self.drain_nodes
         lines = [
@@ -66,8 +74,10 @@ class ServerStatus:
         else:
             lines.extend(_format_drain_node(node) for node in drained)
         if self.storage:
-            lines.append("*스토리지 여유 공간*")
-            lines.extend(_format_storage_volume(volume) for volume in self.storage)
+            lines.append("*스토리지 여유 공간 - 상위 3개*")
+            lines.extend(
+                _format_storage_volume(volume) for volume in self.storage[:STORAGE_DISPLAY_LIMIT]
+            )
         return "\n".join(lines)
 
 

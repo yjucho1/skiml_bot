@@ -4,7 +4,7 @@ from zoneinfo import ZoneInfo
 
 from skiml_bot.adapters.ssh_slurm import SSHConnectionError
 from skiml_bot.periodic_server_status import PeriodicServerStatusPublisher
-from skiml_bot.server_status import ServerStatus, SlurmNode
+from skiml_bot.server_status import ServerStatus, SlurmNode, StorageVolume
 
 
 @dataclass
@@ -88,6 +88,26 @@ def test_periodic_publisher_triggers_workflow_for_drain_node() -> None:
     publisher.publish()
 
     assert alerts.reasons == ["drain 노드 발생"]
+
+
+def test_periodic_publisher_triggers_workflow_for_low_storage() -> None:
+    alerts = FakeAlertWorkflow()
+    publisher = PeriodicServerStatusPublisher(
+        FakeStatusSource(
+            ServerStatus(
+                (SlurmNode("master", "mixed"),),
+                (StorageVolume("n03:/data8", "7T", "6.5T", "500G", 93, "/data8"),),
+            )
+        ),
+        FakeChannel(),
+        channel_id="C0123456789",
+        schedule_timezone=ZoneInfo("Asia/Seoul"),
+        alert_workflow=alerts,
+    )
+
+    publisher.publish()
+
+    assert alerts.reasons == ["data storage 여유 공간 부족"]
 
 
 def test_periodic_publisher_waits_until_next_scheduled_hour() -> None:

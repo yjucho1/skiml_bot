@@ -15,6 +15,7 @@ FAILURE_MESSAGE = "🔴 *[연구실 서버 상태]*\nSSH 또는 `sinfo` 조회�
 STATUS_PUBLISH_HOURS = (8, 12, 16, 20)
 CONNECTION_FAILURE_REASON = "접속 안됨"
 DRAIN_NODE_REASON = "drain 노드 발생"
+STORAGE_CAPACITY_REASON = "data storage 여유 공간 부족"
 
 
 class StatusSource(Protocol):
@@ -63,6 +64,8 @@ class PeriodicServerStatusPublisher:
         status = self._source.fetch()
         if status.drain_nodes:
             self._trigger_alert(DRAIN_NODE_REASON)
+        if status.low_storage_volumes:
+            self._trigger_alert(STORAGE_CAPACITY_REASON)
         self._channel.post_channel(self._channel_id, status.for_slack())
 
     def run(self, stop: StopSignal) -> None:

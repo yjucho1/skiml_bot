@@ -36,6 +36,7 @@ from skiml_bot.meetings import (
 from skiml_bot.periodic_server_status import (
     CONNECTION_FAILURE_REASON,
     DRAIN_NODE_REASON,
+    STORAGE_CAPACITY_REASON,
     PeriodicServerStatusPublisher,
 )
 from skiml_bot.research import (
@@ -155,6 +156,10 @@ def build_app(settings: Settings) -> tuple[App, PeriodicServerStatusPublisher | 
                     else:
                         if status.drain_nodes:
                             _trigger_server_alert(server_alert_workflow, DRAIN_NODE_REASON, logger)
+                        if status.low_storage_volumes:
+                            _trigger_server_alert(
+                                server_alert_workflow, STORAGE_CAPACITY_REASON, logger
+                            )
                         slack.post(channel_id, reply_ts, status.for_slack())
             elif is_paper_summary_request(raw_text):
                 research.handle(
