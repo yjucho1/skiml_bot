@@ -169,6 +169,7 @@ SLURM_SSH_TARGET=bot-user@login.example.edu
 SLURM_SSH_IDENTITY_FILE=.secrets/slurm-monitor
 SLURM_SSH_KNOWN_HOSTS_FILE=.secrets/known_hosts
 SLURM_STATUS_CHANNEL_ID=C0123456789
+SLURM_ALERT_WORKFLOW_WEBHOOK_URL=https://hooks.slack.com/triggers/...
 LAB_TIMEZONE=Asia/Seoul
 ```
 
@@ -185,8 +186,22 @@ ssh -o BatchMode=yes -o StrictHostKeyChecking=yes \
 16:00, 20:00에 같은 결과를 채널에 게시합니다. 재시작 중 놓친 결과는
 몰아서 게시하지 않고 다음 지정 시각부터 재개합니다. SSH 접속 성공 여부, 전체 노드 수와
 `DRAIN`, `DRAINED`, `DRAINING` 계열 노드 및
-사유를 표시하며 CPU/GPU 사용률은 수집하지 않습니다. SSH 키 교환 중 연결 리셋이나 타임아웃은
+사유를 표시합니다. 같은 SSH 연결에서 `df -h`도 실행해 임시 파일시스템을 제외한 각 마운트의
+전체 용량, 남은 용량과 사용률을 함께 표시합니다. 스토리지 출력은 `/home`, `/data`,
+`/data2`~`/data9`로 제한하고, 남은 용량이 큰 상위 3개만 표시합니다. CPU/GPU 사용률은
+수집하지 않습니다.
+SSH 키 교환 중 연결 리셋이나 타임아웃은
 2초 간격으로 최대 3회 시도한 뒤에만 실패로 게시합니다.
+
+`SLURM_ALERT_WORKFLOW_WEBHOOK_URL`을 설정하면 수동 또는 정기 상태 조회에서 master SSH
+접속이 실패할 때 `reason=접속 안됨`, DRAIN 계열 노드가 발견될 때
+`reason=drain 노드 발생`, 지정 스토리지 중 사용률이 90% 이상인 항목이 발견될 때
+`reason=data storage 여유 공간 부족`으로 Slack 워크플로우를 자동 실행합니다.
+Workflow Builder에서
+시작 조건을 **웹훅에서**로 만들고 텍스트 변수 이름을 정확히 `reason`으로 설정한 뒤 생성된
+`https://hooks.slack.com/triggers/...` URL을 사용하세요. `slack.com/shortcuts/...` 링크는
+Slack 안에서 사람이 클릭하는 용도라 자동 호출할 수 없습니다. 웹훅 URL은 저장소에 커밋하지
+말고 배포 서버의 `.env`에만 보관합니다.
 
 비밀번호가 필요한 SSH는 지원하지 않습니다. 봇 전용 key를 만들고 master의
 `authorized_keys`에 등록한 뒤 private key는 봇 서버에만 둡니다. 호스트 키 검증은 끄지 않으며,

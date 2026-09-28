@@ -31,6 +31,7 @@ class Settings:
     slurm_ssh_known_hosts_file: str | None
     slurm_ssh_timeout_seconds: int
     slurm_status_channel_id: str | None
+    slurm_alert_workflow_webhook_url: str | None
     timezone: str
     enabled_features: frozenset[str]
 
@@ -58,6 +59,9 @@ class Settings:
             slurm_ssh_known_hosts_file=os.getenv("SLURM_SSH_KNOWN_HOSTS_FILE") or None,
             slurm_ssh_timeout_seconds=int(os.getenv("SLURM_SSH_TIMEOUT_SECONDS", "10")),
             slurm_status_channel_id=status_channel_id,
+            slurm_alert_workflow_webhook_url=(
+                os.getenv("SLURM_ALERT_WORKFLOW_WEBHOOK_URL", "").strip() or None
+            ),
             timezone=os.getenv("LAB_TIMEZONE", "Asia/Seoul"),
             enabled_features=enabled_features,
         )

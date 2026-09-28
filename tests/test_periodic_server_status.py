@@ -2,8 +2,9 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
+from skiml_bot.adapters.ssh_slurm import SSHConnectionError
 from skiml_bot.periodic_server_status import PeriodicServerStatusPublisher
-from skiml_bot.server_status import ServerStatus, SlurmNode
+from skiml_bot.server_status import ServerStatus, SlurmNode, StorageVolume
 
 
 @dataclass
@@ -43,6 +44,14 @@ class FakeStopSignal:
         return self.results.pop(0)
 
 
+@dataclass
+class FakeAlertWorkflow:
+    reasons: list[str] = field(default_factory=list)
+
+    def trigger(self, reason: str) -> None:
+        self.reasons.append(reason)
+
+
 def test_periodic_publisher_posts_current_status_to_configured_channel() -> None:
     channel = FakeChannel()
     publisher = PeriodicServerStatusPublisher(
@@ -64,6 +73,41 @@ def test_periodic_publisher_posts_current_status_to_configured_channel() -> None
             "🟢 DRAIN 상태인 노드가 없습니다.",
         )
     ]
+
+
+def test_periodic_publisher_triggers_workflow_for_drain_node() -> None:
+    alerts = FakeAlertWorkflow()
+    publisher = PeriodicServerStatusPublisher(
+        FakeStatusSource(ServerStatus((SlurmNode("master", "drained", "Kill task failed"),))),
+        FakeChannel(),
+        channel_id="C0123456789",
+        schedule_timezone=ZoneInfo("Asia/Seoul"),
+        alert_workflow=alerts,
+    )
+
+    publisher.publish()
+
+    assert alerts.reasons == ["drain 노드 발생"]
+
+
+def test_periodic_publisher_triggers_workflow_for_low_storage() -> None:
+    alerts = FakeAlertWorkflow()
+    publisher = PeriodicServerStatusPublisher(
+        FakeStatusSource(
+            ServerStatus(
+                (SlurmNode("master", "mixed"),),
+                (StorageVolume("n03:/data8", "7T", "6.5T", "500G", 93, "/data8"),),
+            )
+        ),
+        FakeChannel(),
+        channel_id="C0123456789",
+        schedule_timezone=ZoneInfo("Asia/Seoul"),
+        alert_workflow=alerts,
+    )
+
+    publisher.publish()
+
+    assert alerts.reasons == ["data storage 여유 공간 부족"]
 
 
 def test_periodic_publisher_waits_until_next_scheduled_hour() -> None:
@@ -149,3 +193,26 @@ def test_periodic_publisher_reports_failure_and_continues_at_next_scheduled_hour
         "🔴 *[연구실 서버 상태]*\nSSH 또는 `sinfo` 조회에 실패했습니다.",
     )
     assert "*전체 노드* — 1개" in channel.messages[1][1]
+
+
+def test_periodic_publisher_triggers_workflow_for_ssh_connection_failure() -> None:
+    timezone_kst = timezone(timedelta(hours=9))
+    times = iter(
+        (
+            datetime(2026, 9, 1, 7, 59, tzinfo=timezone_kst),
+            datetime(2026, 9, 1, 8, 0, tzinfo=timezone_kst),
+        )
+    )
+    alerts = FakeAlertWorkflow()
+    publisher = PeriodicServerStatusPublisher(
+        FlakyStatusSource([SSHConnectionError("connection timed out")]),
+        FakeChannel(),
+        channel_id="C0123456789",
+        schedule_timezone=ZoneInfo("Asia/Seoul"),
+        clock=lambda: next(times),
+        alert_workflow=alerts,
+    )
+
+    publisher.run(FakeStopSignal([False, True]))
+
+    assert alerts.reasons == ["접속 안됨"]

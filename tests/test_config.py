@@ -43,9 +43,16 @@ def test_server_status_requires_only_ssh_target(monkeypatch) -> None:
     monkeypatch.setenv("SLURM_SSH_TARGET", "bot-user@login.example.edu")
     monkeypatch.setenv("SLURM_SSH_TIMEOUT_SECONDS", "7")
     monkeypatch.setenv("SLURM_STATUS_CHANNEL_ID", "C0123456789")
+    monkeypatch.setenv(
+        "SLURM_ALERT_WORKFLOW_WEBHOOK_URL",
+        "https://hooks.slack.com/triggers/T123/456/secret",
+    )
 
     settings = Settings.from_env()
 
     assert settings.slurm_ssh_target == "bot-user@login.example.edu"
     assert settings.slurm_ssh_timeout_seconds == 7
     assert settings.slurm_status_channel_id == "C0123456789"
+    assert settings.slurm_alert_workflow_webhook_url == (
+        "https://hooks.slack.com/triggers/T123/456/secret"
+    )
